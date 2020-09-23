@@ -236,6 +236,8 @@ pub struct File {
     attr: FileAttr
 }
 
+unsafe impl Send for File {}
+
 impl crate::ops::Drop for File {
     fn drop(&mut self) {
         if self.inner.handle.is_null() {
