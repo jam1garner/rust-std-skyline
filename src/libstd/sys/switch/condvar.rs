@@ -32,8 +32,6 @@ impl Condvar {
         let mut attr = MaybeUninit::<libc::pthread_condattr_t>::uninit();
         let r = libc::pthread_condattr_init(attr.as_mut_ptr());
         assert_eq!(r, 0);
-        let r = libc::pthread_condattr_setclock(attr.as_mut_ptr(), libc::CLOCK_MONOTONIC);
-        assert_eq!(r, 0);
         let r = libc::pthread_cond_init(self.inner.get(), attr.as_ptr());
         assert_eq!(r, 0);
         let r = libc::pthread_condattr_destroy(attr.as_mut_ptr());
