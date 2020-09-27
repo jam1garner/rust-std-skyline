@@ -188,6 +188,7 @@ pub struct OpenOptions {
     truncate: bool,
     create: bool,
     create_new: bool,
+    append: bool,
 }
 
 const READ_MODE: u64 = 1;
@@ -202,6 +203,7 @@ impl OpenOptions {
             truncate: false,
             create: false,
             create_new: false,
+            append: false,
         }
     }
 
@@ -215,17 +217,17 @@ impl OpenOptions {
     pub fn write(&mut self, write: bool) {
         if write {
             self.flags |= WRITE_MODE;
+            self.flags |= APPEND_MODE;
         } else {
             self.flags &= !WRITE_MODE;
         }
     }
     pub fn append(&mut self, append: bool) {
         if append {
-            self.flags |= APPEND_MODE;
             self.write(true);
-        } else {
-            self.flags &= !APPEND_MODE;
         }
+
+        self.append = append;
     }
     pub fn truncate(&mut self, truncate: bool) {
         self.truncate = truncate;
@@ -296,7 +298,7 @@ impl File {
                     }
                 },
                 // Path does not exist
-                514 => {
+                514 if opts.create => {
                     nnsdk::fs::CreateFile(path.as_ptr() as _, 0);
                     entry_type = NN_ENTRY_FILE;
                 },
@@ -340,7 +342,7 @@ impl File {
                 r_try!(nnsdk::fs::GetFileSize(&mut size, inner))?;
             }
             
-            let pos = if opts.flags & APPEND_MODE != 0 {
+            let pos = if opts.append {
                 AtomicU64::new(size as u64)
             } else {
                 AtomicU64::new(0)
