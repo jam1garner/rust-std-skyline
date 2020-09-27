@@ -29,7 +29,8 @@ macro_rules! r_try {
 #[derive(Debug)]
 pub struct FileAttr {
     size: AtomicU64,
-    file_type: FileType
+    file_type: FileType,
+    append: bool,
 }
 
 pub struct ReadDir {
@@ -59,7 +60,8 @@ impl Clone for FileAttr {
     fn clone(&self) -> Self {
         Self {
             size: AtomicU64::new(self.size.load(Ordering::SeqCst)),
-            file_type: self.file_type
+            file_type: self.file_type,
+            append: false,
         }
     }
 }
@@ -149,7 +151,8 @@ impl Iterator for ReadDir {
 
         let file_attr = FileAttr {
             size: AtomicU64::new(val.fileSize as u64),
-            file_type
+            file_type,
+            append: false,
         };
 
         Some(Ok(DirEntry {
@@ -182,18 +185,23 @@ impl DirEntry {
 #[derive(Clone, Debug)]
 pub struct OpenOptions {
     flags: u64,
-    truncate: bool
+    truncate: bool,
+    create: bool,
+    create_new: bool,
 }
 
 const READ_MODE: u64 = 1;
 const WRITE_MODE: u64 = 2;
 const APPEND_MODE: u64 = 4;
 
+
 impl OpenOptions {
     pub fn new() -> OpenOptions {
         OpenOptions {
             flags: 0,
-            truncate: false
+            truncate: false,
+            create: false,
+            create_new: false,
         }
     }
 
@@ -214,6 +222,7 @@ impl OpenOptions {
     pub fn append(&mut self, append: bool) {
         if append {
             self.flags |= APPEND_MODE;
+            self.write(true);
         } else {
             self.flags &= !APPEND_MODE;
         }
@@ -221,12 +230,13 @@ impl OpenOptions {
     pub fn truncate(&mut self, truncate: bool) {
         self.truncate = truncate;
     }
-    pub fn create(&mut self, _create: bool) {
-        
+
+    pub fn create(&mut self, create: bool) {
+        self.create = create;
     }
 
-    pub fn create_new(&mut self, _create_new: bool) {
-        panic!("File create new not supported yet")
+    pub fn create_new(&mut self, create_new: bool) {
+        self.create_new = create_new;
     }
 }
 
@@ -279,12 +289,19 @@ impl File {
         let mut entry_type = 0u32;
 
         unsafe {
-            r_try!(
-                nnsdk::fs::GetEntryType(
-                    &mut entry_type,
-                    path.as_ptr() as _
-                )
-            )?;
+            match nnsdk::fs::GetEntryType(&mut entry_type, path.as_ptr() as _) {
+                0 => {
+                    if opts.create_new {
+                        return Err(io::Error::new(io::ErrorKind::AlreadyExists, path.to_str().unwrap()));
+                    }
+                },
+                // Path does not exist
+                514 => {
+                    nnsdk::fs::CreateFile(path.as_ptr() as _, 0);
+                    entry_type = NN_ENTRY_FILE;
+                },
+                result => return Err(io::Error::new(io::ErrorKind::Other, format!("Result code: {}", result))),
+            };
         }
         
         let file_type = match entry_type {
@@ -296,7 +313,8 @@ impl File {
         if let FileType::Dir = file_type {
             let attr = FileAttr {
                 size: AtomicU64::new(0),
-                file_type
+                file_type,
+                append: false,
             };
             return Ok(File {
                 inner, pos: AtomicU64::new(0), attr
@@ -317,7 +335,8 @@ impl File {
             Err(io::Error::new(io::ErrorKind::NotFound, "Returned file handle was null"))
         } else {
             let mut size = 0;
-             unsafe { 
+
+            unsafe {
                 r_try!(nnsdk::fs::GetFileSize(&mut size, inner))?;
             }
             
@@ -327,7 +346,11 @@ impl File {
                 AtomicU64::new(0)
             };
 
-            let attr = stat_internal(&path, size as _)?;
+            let mut attr = stat_internal(&path, size as _)?;
+
+            if opts.flags & APPEND_MODE != 0 {
+                attr.append = true;
+            }
 
             let file = File { inner, pos, attr };
 
@@ -398,13 +421,18 @@ impl File {
 
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         ret_if_null!(self.inner);
+
+        if !self.attr.append && self.pos.load(Ordering::SeqCst) + buf.len() as u64 > self.attr.size.load(Ordering::SeqCst) {
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, format!("The length of the buffer ({}) is larger than the size of the file ({}). Consider using the Append flag.", buf.len(), self.pos.load(Ordering::SeqCst))));
+        }
+
         let rc = unsafe {
             nnsdk::fs::WriteFile(
                 self.inner,
                 self.pos() as _,
                 buf.as_ptr() as _,
                 buf.len() as u64,
-                &nnsdk::fs::WriteOption { flags: 0 }
+                &nnsdk::fs::WriteOption { flags: 1 }
             )
         };
 
@@ -637,14 +665,15 @@ fn stat_internal(cstr: &CStr, size: u64) -> io::Result<FileAttr> {
 
     Ok(FileAttr {
         size: AtomicU64::new(size),
-        file_type
+        file_type,
+        append: false,
     })
 }
 
 pub fn stat(path: &Path) -> io::Result<FileAttr> {
     match get_entry_type(&(cstr(path)?))? {
-        file_type @ FileType::Dir => Ok(FileAttr { size: AtomicU64::new(0), file_type }),
-        file_type @ FileType::File => Ok(FileAttr { size: AtomicU64::new(0), file_type }),
+        file_type @ FileType::Dir => Ok(FileAttr { size: AtomicU64::new(0), file_type, append: false }),
+        file_type @ FileType::File => Ok(FileAttr { size: AtomicU64::new(0), file_type, append: false }),
         //_ => panic!("Bad entry type")
     }
     //File::open(path, &OpenOptions::new())?.file_attr()
