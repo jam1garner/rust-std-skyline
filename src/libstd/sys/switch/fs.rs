@@ -17,10 +17,10 @@ macro_rules! r_try {
     ($expr:expr) => {
         {
             let rc = $expr;
-            if rc == 0 {
-                Ok(())
-            } else {
-                Err(io::Error::from_raw_os_error(rc as _))
+            match rc {
+                0 => Ok(()),
+                0x202 => Err(io::Error::new(io::ErrorKind::NotFound, "the file was not found")),
+                rc => Err(io::Error::from_raw_os_error(rc as _))
             }
         }
     };

@@ -12,8 +12,12 @@ pub fn errno() -> i32 {
     }
 }
 
-pub fn error_string(_errno: i32) -> String {
-    "operation successful".to_string()
+pub fn error_string(errno: i32) -> String {
+    if errno == 0 {
+        "operation successful".to_string()
+    } else {
+        "unknown error".to_string()
+    }
 }
 
 pub fn getcwd() -> io::Result<PathBuf> {
