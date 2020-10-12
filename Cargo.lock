@@ -2335,7 +2335,7 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 [[package]]
 name = "nnsdk"
 version = "0.1.0"
-source = "git+https://github.com/ultimate-research/nnsdk-rs.git#7b499b14a7669da17f843e37a9633238b67395d5"
+source = "git+https://github.com/ultimate-research/nnsdk-rs.git#2a71699aef6668ef19bd449154cf50597f089548"
 dependencies = [
  "libc-nnsdk",
 ]

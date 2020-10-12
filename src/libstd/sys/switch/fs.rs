@@ -284,6 +284,10 @@ macro_rules! ret_if_null {
 
 impl File {
     pub fn open(path: &Path, opts: &OpenOptions) -> io::Result<File> {
+        if !path.is_absolute() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "Path must be absolute"));
+        }
+
         let path = cstr(path)?;
 
         let mut inner = FileHandle { handle: 0 as _ };
@@ -673,6 +677,9 @@ fn stat_internal(cstr: &CStr, size: u64) -> io::Result<FileAttr> {
 }
 
 pub fn stat(path: &Path) -> io::Result<FileAttr> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(io::ErrorKind::NotFound, "Path must be absolute"));
+    }
     match get_entry_type(&(cstr(path)?))? {
         file_type @ FileType::Dir => Ok(FileAttr { size: AtomicU64::new(0), file_type, append: false }),
         file_type @ FileType::File => Ok(FileAttr { size: AtomicU64::new(0), file_type, append: false }),
