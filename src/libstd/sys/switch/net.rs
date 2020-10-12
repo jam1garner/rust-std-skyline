@@ -135,12 +135,12 @@ impl Socket {
                 _ => {
                     // linux returns POLLOUT|POLLERR|POLLHUP for refused connections (!), so look
                     // for POLLHUP rather than read readiness
-                    if pollfd.revents & libc::POLLHUP != 0 {
-                        let e = self.take_error()?.unwrap_or_else(|| {
-                            io::Error::new(io::ErrorKind::Other, "no error set after POLLHUP")
-                        });
-                        return Err(e);
-                    }
+                    // if pollfd.revents & libc::POLLHUP != 0 {
+                    //     let e = self.take_error()?.unwrap_or_else(|| {
+                    //         io::Error::new(io::ErrorKind::Other, "no error set after POLLHUP")
+                    //     });
+                    //     return Err(e);
+                    // }
 
                     return Ok(());
                 }
@@ -276,7 +276,7 @@ impl Socket {
 
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let mut nonblocking = nonblocking as libc::c_int;
-        cvt(unsafe { libc::ioctl(*self.as_inner(), libc::FIONBIO, &mut nonblocking) }).map(drop)
+        cvt(unsafe { libc::fcntl(*self.as_inner(), libc::O_NONBLOCK, &mut nonblocking) }).map(drop)
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
