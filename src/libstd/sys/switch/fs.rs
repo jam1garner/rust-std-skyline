@@ -680,11 +680,45 @@ pub fn stat(path: &Path) -> io::Result<FileAttr> {
     if !path.is_absolute() {
         return Err(io::Error::new(io::ErrorKind::NotFound, "Path must be absolute"));
     }
-    match get_entry_type(&(cstr(path)?))? {
-        file_type @ FileType::Dir => Ok(FileAttr { size: AtomicU64::new(0), file_type, append: false }),
-        file_type @ FileType::File => Ok(FileAttr { size: AtomicU64::new(0), file_type, append: false }),
+
+    let path = cstr(path)?;
+    
+    let file_type = match get_entry_type(&path)? {
+        file_type @ FileType::Dir => file_type,
+        file_type @ FileType::File => file_type,
         //_ => panic!("Bad entry type")
-    }
+    };
+
+    let mut size: Result<AtomicU64, io::Error> = match file_type {
+        FileType::File => {
+            let mut inner = FileHandle { handle: 0 as _ };
+
+            unsafe { 
+                r_try!(
+                    nnsdk::fs::OpenFile(
+                        &mut inner,
+                        path.as_ptr() as _,
+                        READ_MODE as _
+                    )
+                )?;
+
+                let mut filesize = 0;
+                
+                if inner.handle.is_null() {
+                    return Err(io::Error::new(io::ErrorKind::NotFound, "Returned file handle was null"));
+                } else {
+                    r_try!(nnsdk::fs::GetFileSize(&mut filesize, inner))?;
+                }
+                
+                nnsdk::fs::CloseFile(inner);
+
+                Ok(AtomicU64::new(filesize as _))
+            }
+        },
+        FileType::Dir => Ok(AtomicU64::new(0)),
+    };
+
+    Ok(FileAttr { size: size?, file_type, append: false })
     //File::open(path, &OpenOptions::new())?.file_attr()
 }
 
