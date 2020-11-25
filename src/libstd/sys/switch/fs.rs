@@ -586,7 +586,10 @@ pub fn readdir(path: &Path) -> io::Result<ReadDir> {
 }
 
 pub fn unlink(_p: &Path) -> io::Result<()> {
-    unsupported()
+    let path = cstr(_p)?;
+    unsafe {
+        r_try!(nnsdk::fs::DeleteFile(path.as_ptr() as _))
+    }
 }
 
 pub fn rename(old: &Path, new: &Path) -> io::Result<()> {
