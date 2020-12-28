@@ -22,7 +22,10 @@ use crate::alloc::{GlobalAlloc, Layout, System};
 unsafe impl GlobalAlloc for System {
     #[inline]
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        libc::malloc(layout.size()) as *mut u8
+        match layout.align() {
+            0 | 1 => libc::malloc(layout.size()) as *mut u8,
+            n => libc::memalloc(layout.align(), layout.size()) as *mut u8,
+        }
     }
 
     #[inline]

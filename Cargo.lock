@@ -1894,7 +1894,7 @@ dependencies = [
 [[package]]
 name = "libc-nnsdk"
 version = "0.0.1"
-source = "git+https://github.com/ultimate-research/libc-nnsdk.git#3818a3946fbdf7a398f9bba83eefb2b4a3ca1a23"
+source = "git+https://github.com/ultimate-research/libc-nnsdk.git#469b65236ec357c1f71ec6d3b86e8ae88bb7c571"
 dependencies = [
  "rustc-std-workspace-core",
 ]
