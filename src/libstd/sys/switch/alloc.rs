@@ -24,7 +24,7 @@ unsafe impl GlobalAlloc for System {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         match layout.align() {
             0 | 1 => libc::malloc(layout.size()) as *mut u8,
-            n => libc::memalloc(layout.align(), layout.size()) as *mut u8,
+            n => libc::memalign(layout.align(), layout.size()) as *mut u8,
         }
     }
 
