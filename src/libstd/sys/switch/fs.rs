@@ -34,7 +34,8 @@ pub struct FileAttr {
 }
 
 pub struct ReadDir {
-    inner_iter: crate::vec::IntoIter<NinDirEntry>
+    inner_iter: crate::vec::IntoIter<NinDirEntry>,
+    root: PathBuf,
 }
 
 pub struct DirEntry {
@@ -141,7 +142,7 @@ impl Iterator for ReadDir {
         let val = self.inner_iter.next()?;
 
         let len = unsafe { libc::strlen(val.name.as_ptr()) };
-        let path = Path::new(OsStr::from_bytes(&val.name[..len])).to_owned();
+        let path = self.root.join(Path::new(OsStr::from_bytes(&val.name[..len])));
 
         let file_type = match val.type_ as u32 {
             NN_ENTRY_DIR => FileType::Dir,
@@ -541,6 +542,7 @@ impl fmt::Debug for File {
 }
 
 pub fn readdir(path: &Path) -> io::Result<ReadDir> {
+    let path_buf = path.to_path_buf();
     let path = cstr(path)?;
 
     let mut dir_handle = nnsdk::fs::DirectoryHandle { handle: 0 as *mut _ };
@@ -581,7 +583,8 @@ pub fn readdir(path: &Path) -> io::Result<ReadDir> {
     }
 
     Ok(ReadDir {
-        inner_iter: entries.into_iter()
+        inner_iter: entries.into_iter(),
+        root: path_buf
     })
 }
 
