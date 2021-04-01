@@ -231,7 +231,7 @@ fn default_hook(info: &PanicInfo<'_>) {
         let _ = writeln!(err, "{}", err_msg.as_str());
         show_error(
             69,
-            "Skyline plugin has panicked! Please open the details then send a screenshot of the message to the developer, then close the game.\n\0",
+            "Skyline plugin has panicked! Please open the details then send a screenshot of the message to the developer, then close the game.\0",
             err_msg.as_str(),
         );
 
